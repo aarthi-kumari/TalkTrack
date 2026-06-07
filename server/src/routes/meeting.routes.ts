@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { attachPrismaUser } from "../middleware/auth";
 import { requireApiAuth } from "../middleware/require-api-auth";
 import { prisma } from "../lib/prisma";
+import { getMeetingMessageHistory } from "../services/meeting-chat";
 
 const router = Router();
 
@@ -30,6 +31,34 @@ router.get("/room/:roomId", async (req: Request, res: Response) => {
 	} catch (error) {
 		console.error(error);
 		res.status(500).json({ error: "Failed to fetch meeting" });
+	}
+});
+
+router.get("/room/:roomId/messages", async (req: Request, res: Response) => {
+	try {
+		const roomId = String(req.params.roomId);
+		const cursor =
+			typeof req.query.cursor === "string" ? req.query.cursor : undefined;
+		const limit = Math.min(Number(req.query.limit) || 50, 100);
+
+		const meeting = await prisma.meeting.findUnique({
+			where: { roomId },
+		});
+
+		if (!meeting) {
+			return res.status(404).json({ error: "Meeting not found" });
+		}
+
+		const { messages, nextCursor } = await getMeetingMessageHistory(
+			meeting.id,
+			limit,
+			cursor,
+		);
+
+		res.json({ messages, nextCursor });
+	} catch (error) {
+		console.error(error);
+		res.status(500).json({ error: "Failed to fetch messages" });
 	}
 });
 
