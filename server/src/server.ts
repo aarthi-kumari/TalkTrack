@@ -15,6 +15,11 @@ import livekitRoutes from "./routes/livekit.routes";
 import meetingRoutes from "./routes/meeting.routes";
 import userRoutes from "./routes/user.routes";
 import webhookRoutes from "./routes/webhook.routes";
+import { registerSocketHandlers } from "./socket/handlers";
+import type {
+	ClientToServerEvents,
+	ServerToClientEvents,
+} from "./socket/types";
 
 validateClerkEnv();
 
@@ -60,20 +65,14 @@ app.use("/api/livekit", livekitRoutes);
 
 const httpServer = createServer(app);
 
-const io = new Server(httpServer, {
+const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
 	cors: {
-		origin: clientUrl,
+		origin: devOrigins,
 		credentials: true,
 	},
 });
 
-io.on("connection", (socket) => {
-	console.log("Client Connected:", socket.id);
-
-	socket.on("disconnect", () => {
-		console.log("Disconnected:", socket.id);
-	});
-});
+registerSocketHandlers(io);
 
 const port = Number(process.env.PORT) || 5000;
 

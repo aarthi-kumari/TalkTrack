@@ -1,11 +1,17 @@
 import { AccessToken } from "livekit-server-sdk";
 import { Router, type Request, type Response } from "express";
 
+import { getLiveKitConfigStatus, requireLiveKitConfig } from "../lib/livekit-config";
 import { attachPrismaUser } from "../middleware/auth";
 import { requireApiAuth } from "../middleware/require-api-auth";
 import { prisma } from "../lib/prisma";
 
 const router = Router();
+
+router.get("/status", (_req: Request, res: Response) => {
+	const status = getLiveKitConfigStatus();
+	res.json(status);
+});
 
 router.use(requireApiAuth, attachPrismaUser);
 
@@ -17,15 +23,7 @@ router.post("/token", async (req: Request, res: Response) => {
 			return res.status(400).json({ error: "roomId is required" });
 		}
 
-		const apiKey = process.env.LIVEKIT_API_KEY;
-		const apiSecret = process.env.LIVEKIT_API_SECRET;
-		const livekitUrl = process.env.LIVEKIT_URL;
-
-		if (!apiKey || !apiSecret || !livekitUrl) {
-			return res.status(503).json({
-				error: "LiveKit is not configured on the server",
-			});
-		}
+		const { apiKey, apiSecret, url: livekitUrl } = requireLiveKitConfig();
 
 		const meeting = await prisma.meeting.findUnique({
 			where: { roomId: roomId.trim() },
@@ -83,6 +81,16 @@ router.post("/token", async (req: Request, res: Response) => {
 			roomName: meeting.roomId,
 		});
 	} catch (error) {
+		if (
+			error instanceof Error &&
+			error.message.includes("LiveKit is not configured")
+		) {
+			const status = getLiveKitConfigStatus();
+			return res.status(503).json({
+				error: error.message,
+				missing: status.missing,
+			});
+		}
 		console.error("LiveKit token error:", error);
 		return res.status(500).json({ error: "Failed to create LiveKit token" });
 	}

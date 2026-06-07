@@ -18,18 +18,20 @@ export type PresenceUser = {
 	socketId: string;
 };
 
-export type ServerToClientEvents = {
-	message_history: { messages: ChatMessageDto[] };
-	new_message: ChatMessageDto;
-	presence_updated: { participants: PresenceUser[] };
-	typing_update: { roomId: string; typingUsers: string[] };
-	error: { message: string };
-};
+/** Events the server emits to clients */
+export interface ServerToClientEvents {
+	message_history: (payload: { messages: ChatMessageDto[] }) => void;
+	new_message: (message: ChatMessageDto) => void;
+	presence_updated: (payload: { participants: PresenceUser[] }) => void;
+	typing_update: (payload: { roomId: string; typingUsers: string[] }) => void;
+	error: (payload: { message: string }) => void;
+}
 
-export type ClientToServerEvents = {
-	join_meeting: JoinMeetingPayload;
-	leave_meeting: LeaveMeetingPayload;
-	send_message: SendMessagePayload;
-	typing_start: TypingPayload;
-	typing_stop: TypingPayload;
-};
+/** Events clients emit to the server */
+export interface ClientToServerEvents {
+	join_meeting: (payload: JoinMeetingPayload) => void;
+	leave_meeting: (payload: LeaveMeetingPayload) => void;
+	send_message: (payload: SendMessagePayload) => void;
+	typing_start: (payload: TypingPayload) => void;
+	typing_stop: (payload: TypingPayload) => void;
+}

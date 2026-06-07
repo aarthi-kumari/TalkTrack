@@ -24,7 +24,8 @@ export async function authenticateSocket(
 		throw new Error("Invalid auth token");
 	}
 
-	const clerkUserId = result.data.sub;
+	const payload = result.data as { sub?: string };
+	const clerkUserId = payload.sub;
 	if (!clerkUserId) {
 		throw new Error("Invalid token subject");
 	}
