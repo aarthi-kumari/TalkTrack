@@ -16,7 +16,7 @@ todos:
     status: completed
   - id: phase-3-deepgram
     content: "Phase 3b: LiveKit→Deepgram pipeline; transcript_chunk + Transcript DB; transcript UI"
-    status: pending
+    status: completed
   - id: phase-4-passive-ai
     content: "Phase 4: BullMQ workers; Gemini notes + Groq 8B routing; note_updated + NotesPanel"
     status: pending
