@@ -6,17 +6,16 @@ import {
 	RoomAudioRenderer,
 	useParticipants,
 } from "@livekit/components-react";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { AIAssistantPanel } from "@/components/meeting/ai-assistant-panel";
-import { ChatPanel } from "@/components/meeting/ChatPanel";
 import { LiveKitMeetingStage } from "@/components/meeting/livekit-meeting-stage";
 import { LiveKitPreJoinScreen } from "@/components/meeting/livekit-prejoin-screen";
 import { LiveKitSetupBanner } from "@/components/meeting/livekit-setup-banner";
-import { LiveNotesPanel } from "@/components/meeting/live-notes-panel";
+import { LiveKitTranscriptionCapture } from "@/components/meeting/livekit-transcription-capture";
 import { MeetingHeader } from "@/components/meeting/meeting-header";
+import { MeetingSidePanel } from "@/components/meeting/meeting-side-panel";
+import { PreviewTranscriptionCapture } from "@/components/meeting/preview-transcription-capture";
 import { VideoGrid } from "@/components/meeting/VideoGrid";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MeetingRoomProvider, useMeetingRoom } from "@/contexts/meeting-room-context";
@@ -127,13 +126,7 @@ export function MeetingClient({ roomId }: MeetingClientProps) {
 
 	return (
 		<MeetingRoomProvider roomId={roomId}>
-			<div
-				className="flex min-h-0 flex-1 flex-col gap-4 p-4 lg:p-6"
-				style={{
-					backgroundImage:
-						"radial-gradient(circle at top, rgba(99, 102, 241, 0.12), transparent 34%), linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(248, 249, 252, 1))",
-				}}
-			>
+			<div className="meeting-app-shell flex min-h-0 flex-1 flex-col overflow-hidden p-4 lg:p-5">
 				{!livekitConfigured ? (
 					<LiveKitSetupBanner missing={livekitMissing} />
 				) : null}
@@ -169,8 +162,7 @@ export function MeetingClient({ roomId }: MeetingClientProps) {
 						onDisconnected={() => {
 							toast.info("Left the video room");
 						}}
-						className="flex min-h-0 flex-1 flex-col"
-						data-lk-theme="default"
+						className="meeting-app-shell flex min-h-0 flex-1 flex-col"
 					>
 						<LiveKitMeetingLayout
 							roomId={roomId}
@@ -204,15 +196,20 @@ function LiveKitMeetingLayout({
 	elapsed: string;
 }) {
 	const lkParticipants = useParticipants();
-	const { participants: socketParticipants } = useMeetingRoom();
+	const { participants: socketParticipants, transcriptionEnabled } =
+		useMeetingRoom();
 	const participantCount = Math.max(
 		lkParticipants.length,
 		socketParticipants.length,
 	);
 
 	return (
-		<div className="flex min-h-0 flex-1 flex-col gap-4">
-			<div className="rounded-3xl border border-border/70 bg-card/95 p-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)] lg:p-5">
+		<div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+			<LiveKitTranscriptionCapture
+				roomId={roomId}
+				enabled={transcriptionEnabled}
+			/>
+			<div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-border/70 bg-card shadow-sm">
 				<MeetingHeader
 					title={title}
 					roomId={roomId}
@@ -222,15 +219,11 @@ function LiveKitMeetingLayout({
 					inFrame
 				/>
 
-				<div className="mt-4 grid min-h-0 flex-1 gap-4 lg:grid-cols-[1fr_360px]">
-					<div className="min-h-[480px] overflow-hidden rounded-2xl border border-border/60">
+				<div className="meeting-room-grid min-h-0 flex-1 gap-4 p-4 pt-0">
+					<div className="meeting-video-shell overflow-hidden rounded-2xl border border-border/60 bg-black/95">
 						<LiveKitMeetingStage />
 					</div>
-					<div className="flex max-h-[calc(100vh-10rem)] flex-col gap-4 overflow-auto">
-						<LiveNotesPanel />
-						<ChatPanel roomId={roomId} />
-						<AIAssistantPanel />
-					</div>
+					<MeetingSidePanel roomId={roomId} />
 				</div>
 			</div>
 		</div>
@@ -248,10 +241,14 @@ function PreviewMeetingContent({
 	elapsed: string;
 	ended: boolean;
 }) {
-	const { participants } = useMeetingRoom();
+	const { participants, transcriptionEnabled } = useMeetingRoom();
 
 	return (
-		<div className="rounded-3xl border border-border/70 bg-card/95 p-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)] lg:p-5">
+		<div className="meeting-app-shell flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-border/70 bg-card shadow-sm">
+			<PreviewTranscriptionCapture
+				roomId={roomId}
+				enabled={transcriptionEnabled && !ended}
+			/>
 			<MeetingHeader
 				title={title}
 				roomId={roomId}
@@ -261,13 +258,11 @@ function PreviewMeetingContent({
 				inFrame
 			/>
 
-			<div className="mt-4 grid gap-4 lg:grid-cols-[1fr_360px]">
-				<VideoGrid mode="preview" />
-				<div className="flex flex-col gap-4">
-					<LiveNotesPanel />
-					<ChatPanel roomId={roomId} />
-					<AIAssistantPanel />
+			<div className="meeting-room-grid min-h-0 flex-1 gap-4 p-4 pt-0">
+				<div className="meeting-video-shell overflow-hidden rounded-2xl border border-border/60">
+					<VideoGrid mode="preview" />
 				</div>
+				<MeetingSidePanel roomId={roomId} />
 			</div>
 		</div>
 	);

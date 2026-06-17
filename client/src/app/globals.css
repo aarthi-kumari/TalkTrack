@@ -129,19 +129,82 @@
   }
 }
 
-/* LiveKit video stage inside meeting layout */
+/* Meeting page — keep app colors; LiveKit dark theme is scoped to .meeting-livekit-stage */
+.meeting-app-shell {
+	color: var(--foreground);
+}
+
+.meeting-app-shell .meeting-side-panel {
+	scrollbar-gutter: stable;
+}
+
+/* Meeting layout: video + side panel share viewport height */
+.meeting-room-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	grid-template-rows: minmax(0, 1fr);
+	align-items: stretch;
+	min-height: 0;
+	max-height: 100%;
+	height: 100%;
+	overflow: hidden;
+}
+
+@media (min-width: 1024px) {
+	.meeting-room-grid {
+		grid-template-columns: minmax(0, 1.15fr) minmax(320px, 400px);
+	}
+}
+
+.meeting-room-grid > * {
+	min-height: 0;
+	min-width: 0;
+}
+
+.meeting-video-shell {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	height: 100%;
+	max-height: 100%;
+	overflow: hidden;
+}
+
+.meeting-video-shell > * {
+	flex: 1;
+	min-height: 0;
+	height: 100%;
+}
+
+.meeting-side-panel {
+	min-height: 0;
+	max-height: 100%;
+	height: 100%;
+	overflow: hidden;
+}
+
+/* LiveKit video stage (dark theme scoped here only) */
 .meeting-livekit-stage {
-  --lk-control-bar-height: 4rem;
-  min-height: 420px;
+  --lk-control-bar-height: 3.5rem;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
   height: 100%;
-  border-radius: 1rem;
+  min-height: 0;
   overflow: hidden;
   background: var(--lk-bg, #111);
 }
 
+.meeting-livekit-stage .lk-video-conference-inner {
+  flex: 1;
+  min-height: 0;
+}
+
 .meeting-livekit-stage .lk-grid-layout-wrapper,
 .meeting-livekit-stage .lk-focus-layout-wrapper {
-  min-height: 360px;
+  flex: 1;
+  min-height: 0;
+  height: calc(100% - var(--lk-control-bar-height));
 }
 
 .lk-prejoin-theme [data-lk-theme="default"] {

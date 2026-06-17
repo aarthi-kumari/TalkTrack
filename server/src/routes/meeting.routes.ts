@@ -5,6 +5,7 @@ import { attachPrismaUser } from "../middleware/auth";
 import { requireApiAuth } from "../middleware/require-api-auth";
 import { prisma } from "../lib/prisma";
 import { getMeetingMessageHistory } from "../services/meeting-chat";
+import { getMeetingTranscriptHistory } from "../services/meeting-transcript";
 
 const router = Router();
 
@@ -59,6 +60,27 @@ router.get("/room/:roomId/messages", async (req: Request, res: Response) => {
 	} catch (error) {
 		console.error(error);
 		res.status(500).json({ error: "Failed to fetch messages" });
+	}
+});
+
+router.get("/room/:roomId/transcripts", async (req: Request, res: Response) => {
+	try {
+		const roomId = String(req.params.roomId);
+		const limit = Math.min(Number(req.query.limit) || 100, 200);
+
+		const meeting = await prisma.meeting.findUnique({
+			where: { roomId },
+		});
+
+		if (!meeting) {
+			return res.status(404).json({ error: "Meeting not found" });
+		}
+
+		const transcripts = await getMeetingTranscriptHistory(meeting.id, limit);
+		res.json({ transcripts });
+	} catch (error) {
+		console.error(error);
+		res.status(500).json({ error: "Failed to fetch transcripts" });
 	}
 });
 

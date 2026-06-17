@@ -4,6 +4,11 @@ import type { Socket } from "socket.io";
 import { prisma } from "../lib/prisma";
 import type { SocketUserData } from "./types";
 
+function getAuthorizedParties(): string[] {
+	const clientUrl = process.env.CLIENT_URL?.trim() || "http://localhost:3000";
+	return [clientUrl, "http://localhost:3000", "http://127.0.0.1:3000"];
+}
+
 export async function authenticateSocket(
 	socket: Socket,
 ): Promise<SocketUserData> {
@@ -18,13 +23,18 @@ export async function authenticateSocket(
 		throw new Error("CLERK_SECRET_KEY is not configured");
 	}
 
-	const result = await verifyToken(token, { secretKey });
-
-	if (result.errors || !result.data) {
-		throw new Error("Invalid auth token");
+	let payload: { sub?: string };
+	try {
+		payload = await verifyToken(token, {
+			secretKey,
+			authorizedParties: getAuthorizedParties(),
+		});
+	} catch (error) {
+		const message =
+			error instanceof Error ? error.message : "Invalid auth token";
+		throw new Error(message);
 	}
 
-	const payload = result.data as { sub?: string };
 	const clerkUserId = payload.sub;
 	if (!clerkUserId) {
 		throw new Error("Invalid token subject");

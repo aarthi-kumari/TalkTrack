@@ -24,16 +24,12 @@ export function getApiUrl(): string {
 	return resolveApiUrl();
 }
 
-/** Socket.IO: same-origin in browser (proxied via Next) unless a public URL is set. */
+/** Socket.IO: same-origin in browser (proxied via Next) when unset; use explicit URL when set. */
 export function getSocketUrl(): string {
 	const raw = process.env.NEXT_PUBLIC_SOCKET_URL?.trim() ?? "";
 
 	if (typeof window !== "undefined") {
-		if (
-			!raw ||
-			raw === "http://localhost:5000" ||
-			raw === "http://127.0.0.1:5000"
-		) {
+		if (!raw) {
 			return window.location.origin;
 		}
 		return raw;

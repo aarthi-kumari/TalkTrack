@@ -12,7 +12,9 @@ import {
 	validateClerkEnv,
 } from "./lib/clerk-config";
 import livekitRoutes from "./routes/livekit.routes";
+import aiRoutes from "./routes/ai.routes";
 import meetingRoutes from "./routes/meeting.routes";
+import transcriptionRoutes from "./routes/transcription.routes";
 import userRoutes from "./routes/user.routes";
 import webhookRoutes from "./routes/webhook.routes";
 import { registerSocketHandlers } from "./socket/handlers";
@@ -62,6 +64,8 @@ app.use(clerkMiddleware(getClerkMiddlewareOptions(devOrigins)));
 app.use("/api/users", userRoutes);
 app.use("/api/meetings", meetingRoutes);
 app.use("/api/livekit", livekitRoutes);
+app.use("/api/ai", aiRoutes);
+app.use("/api/transcription", transcriptionRoutes);
 
 const httpServer = createServer(app);
 
