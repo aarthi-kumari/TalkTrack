@@ -79,6 +79,8 @@ All `/api/*` routes require a Clerk session token (`Authorization: Bearer <token
 | `GET` | `/api/meetings/room/:roomId` | Meeting metadata by room |
 | `PATCH` | `/api/meetings/:id/end` | End meeting (host only) |
 | `GET` | `/api/livekit/status` | LiveKit config status (no auth) |
+| `GET` | `/api/transcription/status` | Deepgram config status (no auth) |
+| `GET` | `/api/meetings/room/:roomId/transcripts` | Transcript history |
 | `POST` | `/api/livekit/token` | LiveKit join token (`roomId` in body) |
 
 ### LiveKit Cloud (video & audio)
@@ -102,6 +104,19 @@ NEXT_PUBLIC_LIVEKIT_URL="wss://your-project.livekit.cloud"
 5. Restart `npm run dev`. When joining a meeting you will see LiveKit’s **PreJoin** device check, then the official **video grid + control bar** UI.
 
 Without LiveKit keys, the meeting room runs in **preview mode** (chat and presence only).
+
+### Deepgram (live transcription)
+
+1. Create an API key at [console.deepgram.com](https://console.deepgram.com).
+2. Add to `server/.env`:
+
+```env
+DEEPGRAM_API_KEY="..."
+```
+
+3. Restart `npm run dev`. When you join a meeting with the mic on, speech is streamed to Deepgram Nova-2 and captions appear in the **Live transcript** panel. Final lines are saved to the `Transcript` table.
+
+Check config: `GET /api/transcription/status`
 
 ### Clerk webhooks (optional, server-side user sync)
 

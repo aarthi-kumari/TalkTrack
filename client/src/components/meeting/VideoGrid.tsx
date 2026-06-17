@@ -90,7 +90,7 @@ function PreviewVideoGrid() {
 
 function EmptyVideoGrid({ hint }: { hint?: string }) {
 	return (
-		<div className="flex min-h-[520px] flex-1 flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-border/70 bg-card/95 p-8 text-center shadow-[0_20px_60px_-45px_rgba(15,23,42,0.45)] lg:min-h-[640px]">
+		<div className="flex h-full min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/70 bg-card p-6 text-center">
 			<div className="flex size-14 items-center justify-center rounded-full bg-muted">
 				<VideoOff className="size-7 text-muted-foreground" />
 			</div>

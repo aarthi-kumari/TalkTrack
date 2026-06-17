@@ -21,13 +21,37 @@ import {
 	isEqualTrackRef,
 	isTrackReference,
 	isWeb,
+	getTrackReferenceId,
 	type TrackReferenceOrPlaceholder,
 	type WidgetState,
 } from "@livekit/components-core";
 import { RoomEvent, Track } from "livekit-client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { LiveKitSettingsMenu } from "./livekit-settings-menu";
+
+/** Drop camera placeholders once the real track exists (avoids GridLayout pagination crash). */
+function stabilizeTrackList(
+	tracks: TrackReferenceOrPlaceholder[],
+): TrackReferenceOrPlaceholder[] {
+	const realCameraParticipants = new Set(
+		tracks
+			.filter(isTrackReference)
+			.filter((track) => track.source === Track.Source.Camera)
+			.map((track) => track.participant.identity),
+	);
+
+	return tracks.filter((track) => {
+		if (
+			!isTrackReference(track) &&
+			track.source === Track.Source.Camera &&
+			realCameraParticipants.has(track.participant.identity)
+		) {
+			return false;
+		}
+		return true;
+	});
+}
 
 export function LiveKitMeetingStage() {
 	const [widgetState, setWidgetState] = useState<WidgetState>({
@@ -46,14 +70,30 @@ export function LiveKitMeetingStage() {
 		{ updateOnlyOn: [RoomEvent.ActiveSpeakersChanged], onlySubscribed: false },
 	);
 
+	const layoutTracks = useMemo(() => stabilizeTrackList(tracks), [tracks]);
+	const layoutKey = useMemo(
+		() => layoutTracks.map(getTrackReferenceId).join("|"),
+		[layoutTracks],
+	);
+
 	const layoutContext = useCreateLayoutContext();
 
-	const screenShareTracks = tracks
+	const screenShareTracks = layoutTracks
 		.filter(isTrackReference)
 		.filter((track) => track.publication.source === Track.Source.ScreenShare);
 
 	const focusTrack = usePinnedTracks(layoutContext)?.[0];
-	const carouselTracks = tracks.filter((track) => !isEqualTrackRef(track, focusTrack));
+	const carouselTracks = useMemo(
+		() =>
+			stabilizeTrackList(
+				layoutTracks.filter((track) => !isEqualTrackRef(track, focusTrack)),
+			),
+		[layoutTracks, focusTrack],
+	);
+	const carouselKey = useMemo(
+		() => carouselTracks.map(getTrackReferenceId).join("|"),
+		[carouselTracks],
+	);
 
 	useEffect(() => {
 		if (
@@ -78,7 +118,7 @@ export function LiveKitMeetingStage() {
 		}
 
 		if (focusTrack && !isTrackReference(focusTrack)) {
-			const updatedFocusTrack = tracks.find(
+			const updatedFocusTrack = layoutTracks.find(
 				(tr) =>
 					tr.participant.identity === focusTrack.participant.identity &&
 					tr.source === focusTrack.source,
@@ -95,7 +135,7 @@ export function LiveKitMeetingStage() {
 			.map((ref) => `${ref.publication.trackSid}_${ref.publication.isSubscribed}`)
 			.join(),
 		focusTrack?.publication?.trackSid,
-		tracks,
+		layoutTracks,
 		layoutContext.pin,
 	]);
 
@@ -104,7 +144,10 @@ export function LiveKitMeetingStage() {
 	}
 
 	return (
-		<div className="lk-video-conference meeting-livekit-stage flex min-h-0 flex-1 flex-col">
+		<div
+			className="lk-video-conference meeting-livekit-stage flex min-h-0 flex-1 flex-col"
+			data-lk-theme="default"
+		>
 			<LayoutContextProvider
 				value={layoutContext}
 				onWidgetChange={setWidgetState}
@@ -112,14 +155,14 @@ export function LiveKitMeetingStage() {
 				<div className="lk-video-conference-inner min-h-0 flex-1">
 					{!focusTrack ? (
 						<div className="lk-grid-layout-wrapper">
-							<GridLayout tracks={tracks}>
+							<GridLayout key={layoutKey} tracks={layoutTracks}>
 								<ParticipantTile />
 							</GridLayout>
 						</div>
 					) : (
 						<div className="lk-focus-layout-wrapper">
 							<FocusLayoutContainer>
-								<CarouselLayout tracks={carouselTracks}>
+								<CarouselLayout key={carouselKey} tracks={carouselTracks}>
 									<ParticipantTile />
 								</CarouselLayout>
 								{focusTrack ? <FocusLayout trackRef={focusTrack} /> : null}

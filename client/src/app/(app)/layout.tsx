@@ -28,8 +28,10 @@ export default function AppLayout({
 	return (
 		<SidebarProvider>
 			<AppSidebar />
-			<SidebarInset className="flex min-h-svh min-w-0 flex-col">
-				{children}
+			<SidebarInset className="flex h-svh min-h-0 min-w-0 flex-col overflow-hidden">
+				<div className="flex min-h-0 flex-1 flex-col overflow-y-auto has-[.meeting-app-shell]:overflow-hidden">
+					{children}
+				</div>
 			</SidebarInset>
 		</SidebarProvider>
 	);

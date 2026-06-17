@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 
 type ChatPanelProps = {
 	roomId: string;
+	fill?: boolean;
 };
 
 const roleStyles: Record<MessageRole, string> = {
@@ -23,7 +24,7 @@ const roleStyles: Record<MessageRole, string> = {
 	SYSTEM: "border border-dashed border-border bg-transparent text-muted-foreground italic",
 };
 
-export function ChatPanel({ roomId }: ChatPanelProps) {
+export function ChatPanel({ roomId, fill = false }: ChatPanelProps) {
 	const { dbUser } = useUserStore();
 	const {
 		messages,
@@ -59,7 +60,14 @@ export function ChatPanel({ roomId }: ChatPanelProps) {
 	}
 
 	return (
-		<Card className="flex h-[22rem] flex-col border-border/70 bg-card/95 shadow-sm">
+		<Card
+			className={cn(
+				"flex flex-col border-border/70 bg-card shadow-sm",
+				fill
+					? "h-full min-h-0 flex-1 rounded-none border-0 shadow-none"
+					: "h-[min(18rem,32vh)] min-h-[14rem]",
+			)}
+		>
 			<CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border/60 px-4 py-3">
 				<div className="flex items-center gap-2">
 					<MessageSquare className="size-4 text-primary" />

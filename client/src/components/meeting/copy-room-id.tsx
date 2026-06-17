@@ -53,9 +53,14 @@ export function RoomIdDisplay({
 	className?: string;
 }) {
 	return (
-		<p className={cn("font-mono text-xs text-muted-foreground", className)}>
-			Room ID:{" "}
+		<div
+			className={cn(
+				"inline-flex max-w-full items-center gap-2 rounded-lg border border-border/70 bg-muted/50 px-3 py-1.5 font-mono text-xs",
+				className,
+			)}
+		>
+			<span className="shrink-0 text-muted-foreground">Room ID</span>
 			<span className="select-all break-all text-foreground">{roomId}</span>
-		</p>
+		</div>
 	);
 }

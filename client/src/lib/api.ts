@@ -164,6 +164,26 @@ export async function getLiveKitStatus() {
 	});
 }
 
+export async function getTranscriptionStatus() {
+	return apiFetch<{
+		configured: boolean;
+		missing: string[];
+	}>("/api/transcription/status", {
+		method: "GET",
+		token: null,
+	});
+}
+
+export async function getAiStatus() {
+	return apiFetch<{
+		configured: boolean;
+		missing: string[];
+	}>("/api/ai/status", {
+		method: "GET",
+		token: null,
+	});
+}
+
 export async function getLiveKitToken(token: string, roomId: string) {
 	return apiFetch<{ token: string; url: string; roomName: string }>(
 		"/api/livekit/token",
@@ -176,6 +196,16 @@ export async function getLiveKitToken(token: string, roomId: string) {
 }
 
 export type MessageRole = "USER" | "AI" | "SYSTEM";
+
+export type TranscriptChunk = {
+	id?: string;
+	meetingId: string;
+	speaker: string;
+	speakerId: string;
+	text: string;
+	isFinal: boolean;
+	timestamp: string;
+};
 
 export type ChatMessage = {
 	id: string;
