@@ -135,3 +135,8 @@ Client `POST /api/users/sync` still works as a fallback when the app loads.
 ## Protected routes (client)
 
 `/dashboard`, `/meet/*`, `/notes/*`, `/settings/*` require Clerk sign-in.
+
+## Architecture
+
+<img width="825" height="594" alt="image" src="https://github.com/user-attachments/assets/17f7f393-5a0a-4f18-89d9-39e0d7a4f358" />
+
