@@ -32,6 +32,7 @@ function AssistantContent({
 	connected,
 	aiEnabled,
 	aiTyping,
+	aiToolStatus,
 	compact = false,
 }: {
 	messages: AiAssistantMessage[];
@@ -41,6 +42,7 @@ function AssistantContent({
 	connected: boolean;
 	aiEnabled: boolean;
 	aiTyping: boolean;
+	aiToolStatus: string | null;
 	compact?: boolean;
 }) {
 	const bottomRef = useRef<HTMLDivElement>(null);
@@ -61,7 +63,7 @@ function AssistantContent({
 					<div>
 						<h2 className="font-semibold">AI Assistant</h2>
 						<p className="text-xs text-muted-foreground">
-							Ask about this meeting
+							Ask about this meeting, or type @AI in chat
 						</p>
 					</div>
 				</div>
@@ -113,6 +115,9 @@ function AssistantContent({
 								Thinking…
 							</div>
 						) : null}
+						{aiToolStatus ? (
+							<p className="text-xs text-muted-foreground">{aiToolStatus}</p>
+						) : null}
 						<div ref={bottomRef} />
 					</div>
 				</div>
@@ -161,7 +166,8 @@ export function AIAssistantPanel({
 }) {
 	const [input, setInput] = useState("");
 	const isMobile = useIsMobile();
-	const { aiMessages, aiTyping, aiEnabled, connected, askAi } = useMeetingRoom();
+	const { aiMessages, aiTyping, aiEnabled, aiToolStatus, connected, askAi } =
+		useMeetingRoom();
 
 	function handleSend() {
 		const trimmed = input.trim();
@@ -178,6 +184,7 @@ export function AIAssistantPanel({
 		connected,
 		aiEnabled,
 		aiTyping,
+		aiToolStatus,
 	};
 
 	if (isMobile && !embedded) {

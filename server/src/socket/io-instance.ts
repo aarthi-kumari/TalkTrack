@@ -1,15 +1,20 @@
 import type { Server } from "socket.io";
 
-let socketServer: Server | null = null;
+import type { MeetingNoteDto } from "../services/notes.service";
+import type { ClientToServerEvents, ServerToClientEvents } from "./types";
 
-export function setSocketServer(io: Server) {
+type AppServer = Server<ClientToServerEvents, ServerToClientEvents>;
+
+let socketServer: AppServer | null = null;
+
+export function setSocketServer(io: AppServer) {
 	socketServer = io;
 }
 
-export function getSocketServer(): Server | null {
+export function getSocketServer(): AppServer | null {
 	return socketServer;
 }
 
-export function emitNoteUpdated(roomId: string, note: unknown) {
+export function emitNoteUpdated(roomId: string, note: MeetingNoteDto) {
 	socketServer?.to(`room:${roomId}`).emit("note_updated", { note });
 }

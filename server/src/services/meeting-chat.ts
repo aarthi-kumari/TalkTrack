@@ -42,6 +42,7 @@ export async function markParticipantLeft(meetingId: string, userId: string) {
 }
 
 export async function createMeetingMessage(params: {
+	id?: string;
 	meetingId: string;
 	senderId: string;
 	userId: string;
@@ -50,6 +51,7 @@ export async function createMeetingMessage(params: {
 }): Promise<ChatMessageDto> {
 	const message = await prisma.message.create({
 		data: {
+			...(params.id ? { id: params.id } : {}),
 			meetingId: params.meetingId,
 			senderId: params.senderId,
 			userId: params.userId,

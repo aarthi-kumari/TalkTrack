@@ -14,10 +14,13 @@ import {
 import livekitRoutes from "./routes/livekit.routes";
 import aiRoutes from "./routes/ai.routes";
 import meetingRoutes from "./routes/meeting.routes";
+import notesRoutes from "./routes/notes.routes";
 import transcriptionRoutes from "./routes/transcription.routes";
 import userRoutes from "./routes/user.routes";
 import webhookRoutes from "./routes/webhook.routes";
+import { startAiWorkers } from "./queues";
 import { registerSocketHandlers } from "./socket/handlers";
+import { setSocketServer } from "./socket/io-instance";
 import type {
 	ClientToServerEvents,
 	ServerToClientEvents,
@@ -63,6 +66,7 @@ app.use(clerkMiddleware(getClerkMiddlewareOptions(devOrigins)));
 
 app.use("/api/users", userRoutes);
 app.use("/api/meetings", meetingRoutes);
+app.use("/api/notes", notesRoutes);
 app.use("/api/livekit", livekitRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/transcription", transcriptionRoutes);
@@ -77,6 +81,8 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
 });
 
 registerSocketHandlers(io);
+setSocketServer(io);
+startAiWorkers();
 
 const port = Number(process.env.PORT) || 5000;
 

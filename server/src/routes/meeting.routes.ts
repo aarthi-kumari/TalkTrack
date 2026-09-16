@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { attachPrismaUser } from "../middleware/auth";
 import { requireApiAuth } from "../middleware/require-api-auth";
 import { prisma } from "../lib/prisma";
+import { enqueueFinalizeMeeting } from "../queues/finalize.queue";
 import { getMeetingMessageHistory } from "../services/meeting-chat";
 import { getMeetingTranscriptHistory } from "../services/meeting-transcript";
 
@@ -108,10 +109,49 @@ router.patch("/:id/end", async (req: Request, res: Response) => {
 			data: { endedAt: new Date() },
 		});
 
+		void enqueueFinalizeMeeting({
+			meetingId: updated.id,
+			roomId: updated.roomId,
+		});
+
 		res.json(updated);
 	} catch (error) {
 		console.error(error);
 		res.status(500).json({ error: "Failed to end meeting" });
+	}
+});
+
+router.delete("/:id", async (req: Request, res: Response) => {
+	try {
+		const id = String(req.params.id);
+		const userId = req.dbUser!.id;
+
+		const meeting = await prisma.meeting.findUnique({ where: { id } });
+
+		if (!meeting) {
+			return res.status(404).json({ error: "Meeting not found" });
+		}
+
+		if (meeting.hostId !== userId) {
+			return res.status(403).json({ error: "Only the host can delete this meeting" });
+		}
+
+		if (!meeting.endedAt) {
+			return res.status(400).json({
+				error: "End the meeting before deleting it",
+			});
+		}
+
+		await prisma.$transaction([
+			prisma.note.deleteMany({ where: { meetingId: id } }),
+			prisma.transcript.deleteMany({ where: { meetingId: id } }),
+			prisma.meeting.delete({ where: { id } }),
+		]);
+
+		res.json({ deleted: true, id });
+	} catch (error) {
+		console.error(error);
+		res.status(500).json({ error: "Failed to delete meeting" });
 	}
 });
 

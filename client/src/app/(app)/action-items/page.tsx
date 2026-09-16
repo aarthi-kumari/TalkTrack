@@ -1,29 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 
 import { PageHeader } from "@/components/layout/page-header";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { mockActionItems, type MockActionItem } from "@/lib/mock/action-items";
-import { cn } from "@/lib/utils";
-
-const priorityVariant = {
-	high: "destructive",
-	medium: "secondary",
-	low: "outline",
-} as const;
+import { Skeleton } from "@/components/ui/skeleton";
+import { getActionItems } from "@/lib/api";
+import { useApiToken } from "@/hooks/use-api-token";
 
 export default function ActionItemsPage() {
-	const [items, setItems] = useState(mockActionItems);
+	const getToken = useApiToken();
+	const { data, isLoading, error } = useQuery({
+		queryKey: ["action-items"],
+		queryFn: async () => {
+			const token = await getToken();
+			return getActionItems(token);
+		},
+	});
 
-	function toggle(id: string) {
-		setItems((prev) =>
-			prev.map((item) =>
-				item.id === id ? { ...item, done: !item.done } : item,
-			),
-		);
-	}
+	const items = data?.items ?? [];
 
 	return (
 		<div className="flex flex-col gap-6 p-6">
@@ -33,34 +29,43 @@ export default function ActionItemsPage() {
 			/>
 
 			<div className="flex flex-col gap-3">
-				{items.map((item: MockActionItem) => (
-					<Card key={item.id}>
-						<CardContent className="flex items-start gap-3 py-4">
-							<input
-								type="checkbox"
-								checked={item.done ?? false}
-								onChange={() => toggle(item.id)}
-								className="mt-1 size-4 rounded border-input"
-							/>
-							<div className="flex flex-1 flex-col gap-1">
-								<p
-									className={cn(
-										"font-medium",
-										item.done && "text-muted-foreground line-through",
-									)}
-								>
-									{item.title}
-								</p>
-								<p className="text-sm text-muted-foreground">
-									{item.assignee} · Due {item.due}
-								</p>
-							</div>
-							<Badge variant={priorityVariant[item.priority]}>
-								{item.priority}
-							</Badge>
-						</CardContent>
-					</Card>
-				))}
+				{isLoading ? (
+					<>
+						<Skeleton className="h-20 w-full rounded-xl" />
+						<Skeleton className="h-20 w-full rounded-xl" />
+					</>
+				) : error ? (
+					<p className="text-sm text-red-600">
+						{error instanceof Error
+							? error.message
+							: "Failed to load action items"}
+					</p>
+				) : items.length === 0 ? (
+					<p className="text-sm text-muted-foreground">
+						No action items yet. They appear when AI notes capture tasks from a
+						meeting.
+					</p>
+				) : (
+					items.map((item) => (
+						<Card key={item.id}>
+							<CardContent className="flex items-start justify-between gap-3 py-4">
+								<div className="flex flex-col gap-1">
+									<p className="font-medium">{item.text}</p>
+									<p className="text-sm text-muted-foreground">
+										<Link
+											href={`/notes/${item.meetingId}`}
+											className="hover:underline"
+										>
+											{item.meetingTitle}
+										</Link>
+										{item.assignee ? ` · ${item.assignee}` : ""}
+										{item.due ? ` · Due ${item.due}` : ""}
+									</p>
+								</div>
+							</CardContent>
+						</Card>
+					))
+				)}
 			</div>
 		</div>
 	);

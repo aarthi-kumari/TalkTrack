@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Send } from "lucide-react";
+import { CheckSquare, ListTodo, Send, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,16 @@ import { useMeetingRoom } from "@/contexts/meeting-room-context";
 
 export function LiveNotesPanel({ fill = false }: { fill?: boolean }) {
 	const [draft, setDraft] = useState("");
-	const { note, addManualNote, connected } = useMeetingRoom();
+	const { note, addManualNote, connected, passiveAiEnabled } = useMeetingRoom();
 
-	const manualNotes = useMemo(() => note?.content.manualNotes ?? [], [note]);
+	const content = note?.content;
+	const manualNotes = useMemo(() => content?.manualNotes ?? [], [content]);
+	const hasAiNotes = Boolean(
+		content?.summary ||
+			content?.keyPoints.length ||
+			content?.decisions.length ||
+			content?.actionItems.length,
+	);
 
 	function addNote() {
 		const trimmed = draft.trim();
@@ -34,31 +41,121 @@ export function LiveNotesPanel({ fill = false }: { fill?: boolean }) {
 			<CardHeader className="flex-row items-center justify-between gap-3 border-b border-border/60 pb-4">
 				<div>
 					<CardTitle>Live Notes</CardTitle>
-					<p className="text-sm text-muted-foreground">Capture decisions as the meeting unfolds.</p>
+					<p className="text-sm text-muted-foreground">
+						AI captures decisions as the meeting unfolds.
+					</p>
 				</div>
 				<Badge variant="secondary" className="rounded-full px-2.5">
-					Auto-saving
+					{passiveAiEnabled ? "AI listening" : "Manual"}
 				</Badge>
 			</CardHeader>
 			<CardContent className="flex min-h-0 flex-1 flex-col p-0">
 				<ScrollArea className={cn("px-4 py-4", fill ? "min-h-0 flex-1" : "h-40")}>
-					{manualNotes.length === 0 ? (
+					{!connected ? (
 						<p className="text-sm text-muted-foreground">
-							{connected
-								? "No notes yet. Add a note below to share it with everyone in the meeting."
-								: "Connecting to the meeting room…"}
+							Connecting to the meeting room…
+						</p>
+					) : !hasAiNotes && manualNotes.length === 0 ? (
+						<p className="text-sm text-muted-foreground">
+							{passiveAiEnabled
+								? "Notes will appear after a bit of conversation. You can also add a note below."
+								: "Add GOOGLE_AI_API_KEY and GROQ_API_KEY to enable automatic notes, or type a note below."}
 						</p>
 					) : (
-						<ul className="flex flex-col gap-3">
-							{manualNotes.map((text, i) => (
-								<li
-									key={`${i}-${text.slice(0, 24)}`}
-									className="rounded-2xl border border-border/60 bg-muted/40 px-3 py-2 text-sm leading-relaxed text-foreground/80"
-								>
-									{text}
-								</li>
-							))}
-						</ul>
+						<div className="flex flex-col gap-5">
+							{content?.summary ? (
+								<section className="flex flex-col gap-2">
+									<h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+										<Sparkles className="size-3.5" />
+										Summary
+									</h3>
+									<p className="text-sm leading-relaxed text-foreground/85">
+										{content.summary}
+									</p>
+								</section>
+							) : null}
+
+							{content?.keyPoints.length ? (
+								<section className="flex flex-col gap-2">
+									<h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+										Key points
+									</h3>
+									<ul className="flex flex-col gap-1.5">
+										{content.keyPoints.map((item) => (
+											<li
+												key={item}
+												className="text-sm leading-relaxed text-foreground/80"
+											>
+												• {item}
+											</li>
+										))}
+									</ul>
+								</section>
+							) : null}
+
+							{content?.decisions.length ? (
+								<section className="flex flex-col gap-2">
+									<h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+										<CheckSquare className="size-3.5" />
+										Decisions
+									</h3>
+									<ul className="flex flex-col gap-1.5">
+										{content.decisions.map((item) => (
+											<li
+												key={item}
+												className="rounded-2xl border border-border/60 bg-muted/40 px-3 py-2 text-sm leading-relaxed"
+											>
+												{item}
+											</li>
+										))}
+									</ul>
+								</section>
+							) : null}
+
+							{content?.actionItems.length ? (
+								<section className="flex flex-col gap-2">
+									<h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+										<ListTodo className="size-3.5" />
+										Action items
+									</h3>
+									<ul className="flex flex-col gap-1.5">
+										{content.actionItems.map((item) => (
+											<li
+												key={item.text}
+												className="rounded-2xl border border-violet-200/80 bg-violet-50/60 px-3 py-2 text-sm dark:border-violet-900 dark:bg-violet-950/30"
+											>
+												<p>{item.text}</p>
+												{(item.assignee || item.due) && (
+													<p className="mt-1 text-xs text-muted-foreground">
+														{[item.assignee, item.due ? `due ${item.due}` : ""]
+															.filter(Boolean)
+															.join(" · ")}
+													</p>
+												)}
+											</li>
+										))}
+									</ul>
+								</section>
+							) : null}
+
+							{manualNotes.length > 0 ? (
+								<section className="flex flex-col gap-2">
+									<h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+										Your notes
+									</h3>
+									<ul className="flex flex-col gap-3">
+										{manualNotes.map((text, i) => (
+											<li
+												key={`${i}-${text.slice(0, 24)}`}
+												className="rounded-2xl border border-border/60 bg-muted/40 px-3 py-2 text-sm leading-relaxed text-foreground/80"
+											>
+												{text}
+											</li>
+										))}
+									</ul>
+								</section>
+							) : null}
+						</div>
 					)}
 				</ScrollArea>
 			</CardContent>

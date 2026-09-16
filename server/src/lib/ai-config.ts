@@ -26,3 +26,17 @@ export function getPassiveAiConfigStatus() {
 		gemini,
 	};
 }
+
+export function getTavilyConfigStatus(): AiProviderStatus {
+	const apiKey = process.env.TAVILY_API_KEY?.trim();
+	const missing: string[] = [];
+	if (!apiKey) missing.push("TAVILY_API_KEY");
+	return { configured: missing.length === 0, missing };
+}
+
+export function getElevenLabsConfigStatus(): AiProviderStatus {
+	const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
+	const missing: string[] = [];
+	if (!apiKey) missing.push("ELEVENLABS_API_KEY");
+	return { configured: missing.length === 0, missing };
+}

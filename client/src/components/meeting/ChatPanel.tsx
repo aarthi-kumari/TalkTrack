@@ -34,6 +34,7 @@ export function ChatPanel({ roomId, fill = false }: ChatPanelProps) {
 		sendMessage,
 		notifyTypingStart,
 		notifyTypingStop,
+		streamingAiReply,
 	} = useMeetingChat(roomId);
 
 	const [draft, setDraft] = useState("");
@@ -97,6 +98,25 @@ export function ChatPanel({ roomId, fill = false }: ChatPanelProps) {
 								/>
 							))
 						)}
+						{streamingAiReply &&
+						!messages.some((message) => message.id === streamingAiReply.id) ? (
+							<div className="flex flex-col gap-1">
+								<div className="flex items-center gap-2 text-xs text-muted-foreground">
+									<span className="font-medium text-foreground/80">
+										AI Assistant
+									</span>
+									<span>typing…</span>
+								</div>
+								<div
+									className={cn(
+										"max-w-[90%] rounded-2xl px-3 py-2 text-sm leading-relaxed",
+										roleStyles.AI,
+									)}
+								>
+									{streamingAiReply.content || "…"}
+								</div>
+							</div>
+						) : null}
 						<div ref={bottomRef} />
 					</div>
 				</ScrollArea>
@@ -118,7 +138,7 @@ export function ChatPanel({ roomId, fill = false }: ChatPanelProps) {
 								handleSend();
 							}
 						}}
-						placeholder="Message everyone…"
+						placeholder="Message everyone…  Use @AI to ask the assistant"
 						className="min-h-[44px] resize-none"
 						rows={1}
 					/>
@@ -151,6 +171,23 @@ function ChatBubble({
 				? "System"
 				: (message.sender.name ?? message.sender.email);
 
+	let bubbleClass: string;
+	switch (message.role) {
+		case "USER":
+			bubbleClass = roleStyles.USER;
+			break;
+		case "AI":
+			bubbleClass = roleStyles.AI;
+			break;
+		case "SYSTEM":
+			bubbleClass = roleStyles.SYSTEM;
+			break;
+		default: {
+			const exhaustive: never = message.role;
+			bubbleClass = exhaustive;
+		}
+	}
+
 	return (
 		<div className={cn("flex flex-col gap-1", isSelf && "items-end")}>
 			<div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -160,7 +197,7 @@ function ChatBubble({
 			<div
 				className={cn(
 					"max-w-[90%] rounded-2xl px-3 py-2 text-sm leading-relaxed",
-					roleStyles[message.role],
+					bubbleClass,
 					isSelf && message.role === "USER" && "bg-primary/10 text-foreground",
 				)}
 			>

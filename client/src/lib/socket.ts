@@ -1,24 +1,9 @@
 import { io, type Socket } from "socket.io-client";
 
-import type { TranscriptChunk } from "./api";
+import type { ChatMessage, MeetingNoteDto, TranscriptChunk } from "./api";
 import { getSocketUrl } from "./env";
 
-export type MeetingNoteContent = {
-	summary: string;
-	keyPoints: string[];
-	decisions: string[];
-	actionItems: { text: string; assignee?: string; due?: string }[];
-	manualNotes: string[];
-	updatedAt: string;
-};
-
-export type MeetingNoteDto = {
-	id: string;
-	meetingId: string;
-	content: MeetingNoteContent;
-	createdAt: string;
-	updatedAt: string;
-};
+export type { MeetingNoteContent, MeetingNoteDto } from "./api";
 
 export type AiAssistantMessage = {
 	id: string;
@@ -54,7 +39,21 @@ export type ServerSocketEvents = {
 	transcription_stopped: (payload: { roomId: string }) => void;
 	note_current: (payload: { note: MeetingNoteDto | null }) => void;
 	note_updated: (payload: { note: MeetingNoteDto }) => void;
+	ai_history: (payload: { messages: AiAssistantMessage[] }) => void;
 	ai_message: (payload: { message: AiAssistantMessage }) => void;
+	ai_token: (payload: {
+		roomId: string;
+		messageId: string;
+		token: string;
+		done: boolean;
+	}) => void;
+	ai_tool_called: (payload: {
+		roomId: string;
+		messageId: string;
+		name: string;
+		args: Record<string, unknown>;
+		result: string;
+	}) => void;
 	ai_typing: (payload: { roomId: string; typing: boolean }) => void;
 	error: (payload: { message: string }) => void;
 };

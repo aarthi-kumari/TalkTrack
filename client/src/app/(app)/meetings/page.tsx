@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DeleteEndedMeetingButton } from "@/components/dashboard/DeleteEndedMeetingButton";
 import { getMeetings } from "@/lib/api";
 import { useApiToken } from "@/hooks/use-api-token";
 
@@ -33,6 +34,8 @@ export default function MeetingsPage() {
 			date: new Date(m.startedAt).toLocaleString(),
 			duration: m.endedAt ? "Ended" : "Active",
 			roomId: m.roomId,
+			hostId: m.hostId,
+			endedAt: m.endedAt,
 			status: m.endedAt ? ("ended" as const) : ("active" as const),
 		})) ?? [];
 
@@ -81,11 +84,21 @@ export default function MeetingsPage() {
 										{m.duration}
 									</Badge>
 									<CopyRoomIdButton roomId={m.roomId} />
-									{m.status !== "ended" && (
+									{m.status !== "ended" ? (
 										<Button asChild size="sm">
 											<Link href={`/meet/${m.roomId}`}>Join</Link>
 										</Button>
+									) : (
+										<Button asChild size="sm" variant="outline">
+											<Link href={`/notes/${m.id}`}>Notes</Link>
+										</Button>
 									)}
+									<DeleteEndedMeetingButton
+										meetingId={m.id}
+										hostId={m.hostId}
+										endedAt={m.endedAt}
+										title={m.title}
+									/>
 								</div>
 							</CardContent>
 						</Card>
