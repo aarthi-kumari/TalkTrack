@@ -153,6 +153,16 @@ export async function endMeeting(token: string, meetingId: string) {
 	});
 }
 
+export async function deleteMeeting(token: string, meetingId: string) {
+	return apiFetch<{ deleted: boolean; id: string }>(
+		`/api/meetings/${meetingId}`,
+		{
+			method: "DELETE",
+			token,
+		},
+	);
+}
+
 export async function getLiveKitStatus() {
 	return apiFetch<{
 		configured: boolean;
@@ -178,6 +188,12 @@ export async function getAiStatus() {
 	return apiFetch<{
 		configured: boolean;
 		missing: string[];
+		passiveConfigured: boolean;
+		redisConfigured: boolean;
+		groq: { configured: boolean; missing: string[] };
+		gemini: { configured: boolean; missing: string[] };
+		searchWeb: { configured: boolean; provider: string };
+		elevenlabs: { configured: boolean; missing: string[] };
 	}>("/api/ai/status", {
 		method: "GET",
 		token: null,
@@ -196,6 +212,69 @@ export async function getLiveKitToken(token: string, roomId: string) {
 }
 
 export type MessageRole = "USER" | "AI" | "SYSTEM";
+
+export type MeetingNoteActionItem = {
+	text: string;
+	assignee?: string;
+	due?: string;
+};
+
+export type MeetingTalkTime = {
+	speaker: string;
+	seconds: number;
+	wordCount: number;
+};
+
+export type MeetingAnalytics = {
+	talkTimeBySpeaker: MeetingTalkTime[];
+	messageCount: number;
+	aiInvocationCount: number;
+	transcriptCount: number;
+	generatedAt: string;
+};
+
+export type MeetingNoteContent = {
+	summary: string;
+	keyPoints: string[];
+	decisions: string[];
+	actionItems: MeetingNoteActionItem[];
+	manualNotes: string[];
+	analytics?: MeetingAnalytics;
+	updatedAt: string;
+};
+
+export type MeetingNoteDto = {
+	id: string;
+	meetingId: string;
+	content: MeetingNoteContent;
+	createdAt: string;
+	updatedAt: string;
+};
+
+export type MeetingNoteListItem = MeetingNoteDto & {
+	meeting: {
+		id: string;
+		title: string;
+		roomId: string;
+		startedAt: string;
+		endedAt: string | null;
+	};
+};
+
+export type ActionItemDto = {
+	id: string;
+	meetingId: string;
+	meetingTitle: string;
+	text: string;
+	assignee?: string;
+	due?: string;
+};
+
+export type DashboardSummary = {
+	activeMeetings: number;
+	openActionItems: number;
+	notesCount: number;
+};
 
 export type TranscriptChunk = {
 	id?: string;
@@ -237,4 +316,49 @@ export async function getMeetingMessages(
 		path,
 		{ method: "GET", token },
 	);
+}
+
+export async function getDashboardSummary(token: string) {
+	return apiFetch<DashboardSummary>("/api/notes/summary", {
+		method: "GET",
+		token,
+	});
+}
+
+export async function getMeetingNotes(token: string) {
+	return apiFetch<{ notes: MeetingNoteListItem[] }>("/api/notes", {
+		method: "GET",
+		token,
+	});
+}
+
+export async function getMeetingNote(token: string, meetingId: string) {
+	return apiFetch<{
+		meeting: {
+			id: string;
+			title: string;
+			roomId: string;
+			hostId: string;
+			startedAt: string;
+			endedAt: string | null;
+		};
+		note: MeetingNoteDto | null;
+	}>(`/api/notes/${meetingId}`, {
+		method: "GET",
+		token,
+	});
+}
+
+export async function getMeetingAnalytics(token: string, meetingId: string) {
+	return apiFetch<{ analytics: MeetingAnalytics }>(
+		`/api/notes/${meetingId}/analytics`,
+		{ method: "GET", token },
+	);
+}
+
+export async function getActionItems(token: string) {
+	return apiFetch<{ items: ActionItemDto[] }>("/api/notes/action-items", {
+		method: "GET",
+		token,
+	});
 }

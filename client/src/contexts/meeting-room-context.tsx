@@ -39,6 +39,9 @@ type MeetingRoomContextValue = {
 	aiMessages: AiAssistantMessage[];
 	aiTyping: boolean;
 	aiEnabled: boolean;
+	passiveAiEnabled: boolean;
+	aiToolStatus: string | null;
+	streamingAiReply: { id: string; content: string } | null;
 	connected: boolean;
 	sendMessage: (content: string) => void;
 	addManualNote: (text: string) => void;
@@ -70,6 +73,12 @@ export function MeetingRoomProvider({
 	const [aiMessages, setAiMessages] = useState<AiAssistantMessage[]>([]);
 	const [aiTyping, setAiTyping] = useState(false);
 	const [aiEnabled, setAiEnabled] = useState(false);
+	const [passiveAiEnabled, setPassiveAiEnabled] = useState(false);
+	const [aiToolStatus, setAiToolStatus] = useState<string | null>(null);
+	const [streamingAiReply, setStreamingAiReply] = useState<{
+		id: string;
+		content: string;
+	} | null>(null);
 	const [connected, setConnected] = useState(false);
 	const joinedRef = useRef(false);
 	const roomIdRef = useRef(roomId);
@@ -154,6 +163,7 @@ export function MeetingRoomProvider({
 			.then((status) => {
 				if (!cancelled) {
 					setAiEnabled(status.configured);
+					setPassiveAiEnabled(status.passiveConfigured);
 				}
 			})
 			.catch(() => {
@@ -250,10 +260,76 @@ export function MeetingRoomProvider({
 					setNote(updated);
 				};
 
+				const onAiHistory = ({
+					messages: history,
+				}: {
+					messages: AiAssistantMessage[];
+				}) => {
+					setAiMessages(history);
+				};
+
 				const onAiMessage = ({ message }: { message: AiAssistantMessage }) => {
 					setAiMessages((prev) =>
 						prev.some((row) => row.id === message.id) ? prev : [...prev, message],
 					);
+				};
+
+				const onAiToken = ({
+					roomId: tokenRoomId,
+					messageId,
+					token,
+					done,
+				}: {
+					roomId: string;
+					messageId: string;
+					token: string;
+					done: boolean;
+				}) => {
+					if (tokenRoomId !== roomId) return;
+
+					setStreamingAiReply((prev) => {
+						if (done) return null;
+						if (prev?.id === messageId) {
+							return { id: messageId, content: prev.content + token };
+						}
+						return { id: messageId, content: token };
+					});
+
+					if (!done && token) {
+						setAiMessages((prev) => {
+							const existing = prev.find((row) => row.id === messageId);
+							if (!existing) {
+								return [
+									...prev,
+									{
+										id: messageId,
+										role: "ai",
+										content: token,
+										timestamp: new Date().toISOString(),
+									},
+								];
+							}
+							return prev.map((row) =>
+								row.id === messageId
+									? { ...row, content: row.content + token }
+									: row,
+							);
+						});
+					}
+				};
+
+				const onAiToolCalled = ({
+					roomId: toolRoomId,
+					name,
+				}: {
+					roomId: string;
+					messageId: string;
+					name: string;
+					args: Record<string, unknown>;
+					result: string;
+				}) => {
+					if (toolRoomId !== roomId) return;
+					setAiToolStatus(`Used ${name.replaceAll("_", " ")}`);
 				};
 
 				const onAiTyping = ({
@@ -295,7 +371,10 @@ export function MeetingRoomProvider({
 				socket.on("transcript_chunk", onTranscriptChunk);
 				socket.on("note_current", onNoteCurrent);
 				socket.on("note_updated", onNoteUpdated);
+				socket.on("ai_history", onAiHistory);
 				socket.on("ai_message", onAiMessage);
+				socket.on("ai_token", onAiToken);
+				socket.on("ai_tool_called", onAiToolCalled);
 				socket.on("ai_typing", onAiTyping);
 				socket.on("error", onError);
 
@@ -314,7 +393,10 @@ export function MeetingRoomProvider({
 					socket.off("transcript_chunk", onTranscriptChunk);
 					socket.off("note_current", onNoteCurrent);
 					socket.off("note_updated", onNoteUpdated);
+					socket.off("ai_history", onAiHistory);
 					socket.off("ai_message", onAiMessage);
+					socket.off("ai_token", onAiToken);
+					socket.off("ai_tool_called", onAiToolCalled);
 					socket.off("ai_typing", onAiTyping);
 					socket.off("error", onError);
 					socket.emit("leave_meeting", { roomId });
@@ -350,6 +432,9 @@ export function MeetingRoomProvider({
 			setAiMessages([]);
 			setAiTyping(false);
 			setAiEnabled(false);
+			setPassiveAiEnabled(false);
+			setAiToolStatus(null);
+			setStreamingAiReply(null);
 		};
 	}, [roomId, getToken, dbUser]);
 
@@ -365,6 +450,9 @@ export function MeetingRoomProvider({
 			aiMessages,
 			aiTyping,
 			aiEnabled,
+			passiveAiEnabled,
+			aiToolStatus,
+			streamingAiReply,
 			connected,
 			sendMessage,
 			addManualNote,
@@ -383,6 +471,9 @@ export function MeetingRoomProvider({
 			aiMessages,
 			aiTyping,
 			aiEnabled,
+			passiveAiEnabled,
+			aiToolStatus,
+			streamingAiReply,
 			connected,
 			sendMessage,
 			addManualNote,
@@ -424,6 +515,7 @@ export function useMeetingChat(roomId: string | null) {
 			interimTranscripts: {},
 			transcriptionEnabled: false,
 			connected: false,
+			streamingAiReply: null,
 			sendMessage: () => undefined,
 			notifyTypingStart: () => undefined,
 			notifyTypingStop: () => undefined,

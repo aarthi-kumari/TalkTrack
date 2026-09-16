@@ -7,9 +7,9 @@ import {
 	markParticipantLeft,
 	upsertMeetingParticipant,
 } from "../services/meeting-chat";
-import {
-	getDeepgramConfigStatus,
-} from "../lib/deepgram-config";
+import { getDeepgramConfigStatus } from "../lib/deepgram-config";
+import { getGroqConfigStatus } from "../lib/ai-config";
+import { hasAiMention, stripAiMention } from "../lib/ai-mention";
 import {
 	hasDeepgramSession,
 	sendDeepgramAudio,
@@ -19,10 +19,15 @@ import {
 import { getMeetingTranscriptHistory } from "../services/meeting-transcript";
 import {
 	getMeetingNoteByRoomId,
-	refreshMeetingNotesFromTranscripts,
 	upsertManualNoteForRoomId,
 } from "../services/notes.service";
-import { answerMeetingAssistantQuestion } from "../services/ai-assistant.service";
+import { classifyInteractiveIntent } from "../ai/groq";
+import {
+	getAssistantHistory,
+	persistAssistantReply,
+	streamMeetingAssistantQuestion,
+} from "../services/ai-assistant.service";
+import { enqueueProcessTranscript } from "../queues/transcript.queue";
 import { authenticateSocket } from "./auth";
 import type {
 	AiAssistantMessage,
@@ -38,9 +43,6 @@ const meetingRoom = (roomId: string) => `room:${roomId}`;
 const presenceByRoom = new Map<string, Map<string, PresenceUser>>();
 /** userId -> displayName for users currently typing */
 const typingByRoom = new Map<string, Map<string, string>>();
-
-/** Debounced passive note refresh per meetingId */
-const notesRefreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function getPresenceList(roomId: string): PresenceUser[] {
 	const byUser = new Map<string, PresenceUser>();
@@ -79,32 +81,126 @@ function emitTyping(
 	});
 }
 
-function scheduleNotesRefresh(
-	io: Server<ClientToServerEvents, ServerToClientEvents>,
-	params: { roomId: string; meetingId: string },
-) {
-	const existing = notesRefreshTimers.get(params.meetingId);
-	if (existing) clearTimeout(existing);
+async function shouldTriggerAssistant(content: string): Promise<{
+	trigger: boolean;
+	question: string;
+}> {
+	const question = stripAiMention(content) || "Summarize this meeting so far.";
+	if (hasAiMention(content)) {
+		return { trigger: true, question };
+	}
 
-	const timer = setTimeout(() => {
-		void refreshMeetingNotesFromTranscripts({
+	if (!getGroqConfigStatus().configured || content.trim().length < 24) {
+		return { trigger: false, question: content };
+	}
+
+	try {
+		const addressed = await classifyInteractiveIntent(content);
+		return { trigger: addressed, question: content };
+	} catch (error) {
+		console.warn("interactive intent classification failed:", error);
+		return { trigger: false, question: content };
+	}
+}
+
+async function runInteractiveAssistant(params: {
+	io: Server<ClientToServerEvents, ServerToClientEvents>;
+	roomId: string;
+	meetingId: string;
+	userId: string;
+	isHost: boolean;
+	question: string;
+	emitUserPanelMessage: boolean;
+	userPanelContent?: string;
+}) {
+	const channel = meetingRoom(params.roomId);
+	const messageId = crypto.randomUUID();
+
+	if (params.emitUserPanelMessage) {
+		const userPanel: AiAssistantMessage = {
+			id: crypto.randomUUID(),
+			role: "user",
+			content: params.userPanelContent ?? params.question,
+			timestamp: new Date().toISOString(),
+		};
+		params.io.to(channel).emit("ai_message", { message: userPanel });
+	}
+
+	params.io.to(channel).emit("ai_typing", {
+		roomId: params.roomId,
+		typing: true,
+	});
+
+	let answer = "";
+	try {
+		answer = await streamMeetingAssistantQuestion({
 			roomId: params.roomId,
-			meetingId: params.meetingId,
-		})
-			.then((note) => {
-				if (note) {
-					io.to(meetingRoom(params.roomId)).emit("note_updated", { note });
-				}
-			})
-			.catch((err) => {
-				console.warn("notes refresh failed:", err);
-			})
-			.finally(() => {
-				notesRefreshTimers.delete(params.meetingId);
-			});
-	}, 30_000);
+			question: params.question,
+			requestedByUserId: params.userId,
+			isHost: params.isHost,
+			onToken: (token) => {
+				params.io.to(channel).emit("ai_token", {
+					roomId: params.roomId,
+					messageId,
+					token,
+					done: false,
+				});
+			},
+			onToolCalled: ({ name, args, result }) => {
+				params.io.to(channel).emit("ai_tool_called", {
+					roomId: params.roomId,
+					messageId,
+					name,
+					args,
+					result,
+				});
+			},
+			onChatMessage: (message) => {
+				params.io.to(channel).emit("new_message", message);
+			},
+		});
 
-	notesRefreshTimers.set(params.meetingId, timer);
+		const aiDto = await persistAssistantReply({
+			id: messageId,
+			meetingId: params.meetingId,
+			userId: params.userId,
+			answer,
+		});
+
+		params.io.to(channel).emit("ai_token", {
+			roomId: params.roomId,
+			messageId,
+			token: "",
+			done: true,
+		});
+
+		const aiPanel: AiAssistantMessage = {
+			id: aiDto.id,
+			role: "ai",
+			content: aiDto.content,
+			timestamp: aiDto.createdAt,
+		};
+
+		params.io.to(channel).emit("ai_message", { message: aiPanel });
+		params.io.to(channel).emit("new_message", aiDto);
+	} catch (error) {
+		console.error("interactive assistant error:", error);
+		params.io.to(channel).emit("ai_token", {
+			roomId: params.roomId,
+			messageId,
+			token: "",
+			done: true,
+		});
+		params.io.to(channel).emit("error", {
+			message:
+				error instanceof Error ? error.message : "Failed to get AI response",
+		});
+	} finally {
+		params.io.to(channel).emit("ai_typing", {
+			roomId: params.roomId,
+			typing: false,
+		});
+	}
 }
 
 async function leaveRoom(
@@ -210,8 +306,15 @@ export function registerSocketHandlers(
 					socket.emit("transcript_history", { transcripts });
 				}
 
-				const note = await getMeetingNoteByRoomId(roomId.trim()).catch(() => null);
+				const note = await getMeetingNoteByRoomId(roomId.trim()).catch(
+					() => null,
+				);
 				socket.emit("note_current", { note });
+
+				const aiHistory = await getAssistantHistory(meeting.id).catch(
+					() => [],
+				);
+				socket.emit("ai_history", { messages: aiHistory });
 
 				emitPresence(io, roomId);
 			} catch (error) {
@@ -261,6 +364,20 @@ export function registerSocketHandlers(
 				emitTyping(io, roomId);
 
 				io.to(meetingRoom(roomId)).emit("new_message", message);
+
+				const { trigger, question } = await shouldTriggerAssistant(text);
+				if (!trigger || !getGroqConfigStatus().configured) return;
+
+				await runInteractiveAssistant({
+					io,
+					roomId: roomId.trim(),
+					meetingId: meeting.id,
+					userId: user.userId,
+					isHost: meeting.hostId === user.userId,
+					question,
+					emitUserPanelMessage: true,
+					userPanelContent: question,
+				});
 			} catch (error) {
 				console.error("send_message error:", error);
 				socket.emit("error", { message: "Failed to send message" });
@@ -307,31 +424,36 @@ export function registerSocketHandlers(
 				await startDeepgramSession(
 					socket.id,
 					{
-					meetingId: meeting.id,
-					speaker: user.displayName,
-					speakerId: user.userId,
-					onResult: (chunk) => {
-						io.to(meetingRoom(trimmedRoomId)).emit("transcript_chunk", {
-							meetingId: meeting.id,
-							speaker: chunk.speaker,
-							speakerId: chunk.speakerId,
-							text: chunk.text,
-							isFinal: chunk.isFinal,
-							timestamp: chunk.timestamp,
-							id: chunk.id,
-						});
-
-						if (chunk.isFinal) {
-							scheduleNotesRefresh(io, {
-								roomId: trimmedRoomId,
+						meetingId: meeting.id,
+						speaker: user.displayName,
+						speakerId: user.userId,
+						onResult: (chunk) => {
+							io.to(meetingRoom(trimmedRoomId)).emit("transcript_chunk", {
 								meetingId: meeting.id,
+								speaker: chunk.speaker,
+								speakerId: chunk.speakerId,
+								text: chunk.text,
+								isFinal: chunk.isFinal,
+								timestamp: chunk.timestamp,
+								id: chunk.id,
 							});
-						}
+
+							if (chunk.isFinal && chunk.id) {
+								void enqueueProcessTranscript({
+									meetingId: meeting.id,
+									roomId: trimmedRoomId,
+									transcriptId: chunk.id,
+									speaker: chunk.speaker,
+									text: chunk.text,
+								});
+							}
+						},
+						onClose: () => {
+							socket.emit("transcription_stopped", {
+								roomId: trimmedRoomId,
+							});
+						},
 					},
-					onClose: () => {
-						socket.emit("transcription_stopped", { roomId: trimmedRoomId });
-					},
-				},
 					sampleRate ?? 48_000,
 				);
 
@@ -405,56 +527,44 @@ export function registerSocketHandlers(
 					return;
 				}
 
+				if (!getGroqConfigStatus().configured) {
+					socket.emit("error", {
+						message:
+							"AI assistant is not configured. Add GROQ_API_KEY to server/.env.",
+					});
+					return;
+				}
+
 				const meeting = await getMeetingByRoomId(trimmedRoomId);
 				if (!meeting || meeting.endedAt) {
 					socket.emit("error", { message: "Meeting not available" });
 					return;
 				}
 
-				const userMessage: AiAssistantMessage = {
-					id: crypto.randomUUID(),
-					role: "user",
+				const userMessage = await createMeetingMessage({
+					meetingId: meeting.id,
+					senderId: user.userId,
+					userId: user.userId,
 					content: trimmedContent,
-					timestamp: new Date().toISOString(),
-				};
-
-				io.to(meetingRoom(trimmedRoomId)).emit("ai_message", {
-					message: userMessage,
+					role: "USER",
 				});
+				io.to(meetingRoom(trimmedRoomId)).emit("new_message", userMessage);
 
-				io.to(meetingRoom(trimmedRoomId)).emit("ai_typing", {
+				await runInteractiveAssistant({
+					io,
 					roomId: trimmedRoomId,
-					typing: true,
-				});
-
-				const reply = await answerMeetingAssistantQuestion({
-					roomId: trimmedRoomId,
-					question: trimmedContent,
-				});
-
-				const aiMessage: AiAssistantMessage = {
-					id: crypto.randomUUID(),
-					role: "ai",
-					content: reply,
-					timestamp: new Date().toISOString(),
-				};
-
-				io.to(meetingRoom(trimmedRoomId)).emit("ai_message", {
-					message: aiMessage,
+					meetingId: meeting.id,
+					userId: user.userId,
+					isHost: meeting.hostId === user.userId,
+					question: stripAiMention(trimmedContent) || trimmedContent,
+					emitUserPanelMessage: true,
+					userPanelContent: trimmedContent,
 				});
 			} catch (error) {
 				console.error("ask_ai error:", error);
 				const message =
 					error instanceof Error ? error.message : "Failed to get AI response";
 				socket.emit("error", { message });
-			} finally {
-				const trimmedRoomId = roomId?.trim();
-				if (trimmedRoomId) {
-					io.to(meetingRoom(trimmedRoomId)).emit("ai_typing", {
-						roomId: trimmedRoomId,
-						typing: false,
-					});
-				}
 			}
 		});
 

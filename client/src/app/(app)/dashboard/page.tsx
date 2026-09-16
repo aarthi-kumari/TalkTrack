@@ -1,6 +1,7 @@
 "use client";
 
 import { Video } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 import { CreateMeetingDialog } from "@/components/dashboard/CreateMeetingDialog";
 import { JoinMeetingDialog } from "@/components/layout/join-meeting-dialog";
@@ -8,10 +9,22 @@ import { RecentMeetings } from "@/components/dashboard/RecentMeetings";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getDashboardSummary } from "@/lib/api";
+import { useApiToken } from "@/hooks/use-api-token";
 import { useUserStore } from "@/stores/user-store";
 
 export default function DashboardPage() {
 	const { dbUser, isSyncing, syncError } = useUserStore();
+	const getToken = useApiToken();
+
+	const { data: summary } = useQuery({
+		queryKey: ["dashboard-summary", dbUser?.id],
+		queryFn: async () => {
+			const token = await getToken();
+			return getDashboardSummary(token);
+		},
+		enabled: Boolean(dbUser),
+	});
 
 	return (
 		<div className="flex flex-col gap-8 p-6">
@@ -43,11 +56,11 @@ export default function DashboardPage() {
 			<div className="grid gap-4 md:grid-cols-3">
 				<Card>
 					<CardHeader>
-						<CardTitle className="text-base">Upcoming</CardTitle>
+						<CardTitle className="text-base">Active meetings</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<p className="text-2xl font-bold">3</p>
-						<p className="text-sm text-muted-foreground">meetings this week</p>
+						<p className="text-2xl font-bold">{summary?.activeMeetings ?? 0}</p>
+						<p className="text-sm text-muted-foreground">currently in progress</p>
 					</CardContent>
 				</Card>
 				<Card>
@@ -55,8 +68,8 @@ export default function DashboardPage() {
 						<CardTitle className="text-base">Action items</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<p className="text-2xl font-bold">5</p>
-						<p className="text-sm text-muted-foreground">open tasks</p>
+						<p className="text-2xl font-bold">{summary?.openActionItems ?? 0}</p>
+						<p className="text-sm text-muted-foreground">from meeting notes</p>
 					</CardContent>
 				</Card>
 				<Card>
@@ -64,7 +77,7 @@ export default function DashboardPage() {
 						<CardTitle className="text-base">Notes</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<p className="text-2xl font-bold">12</p>
+						<p className="text-2xl font-bold">{summary?.notesCount ?? 0}</p>
 						<p className="text-sm text-muted-foreground">saved summaries</p>
 					</CardContent>
 				</Card>

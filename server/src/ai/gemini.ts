@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 import { getGeminiConfigStatus } from "../lib/ai-config";
+import { parseJsonObject } from "../lib/json";
 import { buildPassiveNotesPrompt } from "./prompts/passive-notes";
 import type { MeetingNoteContent } from "../services/notes.service";
 
@@ -26,12 +27,11 @@ const EMPTY_CONTENT: MeetingNoteContent = {
 	updatedAt: new Date().toISOString(),
 };
 
-function parseNotesContent(raw: string): Partial<MeetingNoteContent> {
-	try {
-		return JSON.parse(raw) as Partial<MeetingNoteContent>;
-	} catch {
-		return {};
-	}
+const NOTE_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"] as const;
+
+function asStringArray(value: unknown): string[] | null {
+	if (!Array.isArray(value)) return null;
+	return value.filter((item): item is string => typeof item === "string");
 }
 
 export async function generatePassiveMeetingNotes(params: {
@@ -44,25 +44,38 @@ export async function generatePassiveMeetingNotes(params: {
 		return params.currentNotes;
 	}
 
-	const model = client.getGenerativeModel({ model: "gemini-2.0-flash" });
 	const prompt = buildPassiveNotesPrompt({
 		meetingTitle: params.meetingTitle,
 		transcriptLines: params.transcriptLines,
 		currentNotesJson: JSON.stringify(params.currentNotes, null, 2),
 	});
 
-	const result = await model.generateContent(prompt);
-	const text = result.response.text();
-	const parsed = parseNotesContent(text);
+	let raw = "";
+	let lastError: unknown;
+	for (const modelName of NOTE_MODELS) {
+		try {
+			const model = client.getGenerativeModel({ model: modelName });
+			const result = await model.generateContent(prompt);
+			raw = result.response.text();
+			lastError = undefined;
+			break;
+		} catch (error) {
+			lastError = error;
+		}
+	}
+
+	if (lastError && !raw) {
+		console.warn("Gemini notes generation failed:", lastError);
+		return params.currentNotes;
+	}
+
+	const parsed = parseJsonObject<MeetingNoteContent>(raw);
 
 	return {
-		summary: typeof parsed.summary === "string" ? parsed.summary : params.currentNotes.summary,
-		keyPoints: Array.isArray(parsed.keyPoints)
-			? parsed.keyPoints.filter((item): item is string => typeof item === "string")
-			: params.currentNotes.keyPoints,
-		decisions: Array.isArray(parsed.decisions)
-			? parsed.decisions.filter((item): item is string => typeof item === "string")
-			: params.currentNotes.decisions,
+		summary:
+			typeof parsed.summary === "string" ? parsed.summary : params.currentNotes.summary,
+		keyPoints: asStringArray(parsed.keyPoints) ?? params.currentNotes.keyPoints,
+		decisions: asStringArray(parsed.decisions) ?? params.currentNotes.decisions,
 		actionItems: Array.isArray(parsed.actionItems)
 			? parsed.actionItems
 					.filter(
@@ -78,6 +91,7 @@ export async function generatePassiveMeetingNotes(params: {
 					}))
 			: params.currentNotes.actionItems,
 		manualNotes: params.currentNotes.manualNotes,
+		analytics: params.currentNotes.analytics,
 		updatedAt: new Date().toISOString(),
 	};
 }

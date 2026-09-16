@@ -11,6 +11,7 @@ import { useApiToken } from "@/hooks/use-api-token";
 import { useUserStore } from "@/stores/user-store";
 
 import { CopyRoomIdButton, RoomIdDisplay } from "@/components/meeting/copy-room-id";
+import { DeleteEndedMeetingButton } from "./DeleteEndedMeetingButton";
 
 type MeetingCardProps = {
 	meeting: Meeting;
@@ -57,7 +58,11 @@ export function MeetingCard({ meeting }: MeetingCardProps) {
 			</div>
 
 			<div className="flex flex-wrap gap-2">
-				{!ended && (
+				{ended ? (
+					<Button asChild size="sm" variant="outline">
+						<Link href={`/notes/${meeting.id}`}>View notes</Link>
+					</Button>
+				) : (
 					<Button asChild size="sm">
 						<Link href={`/meet/${meeting.roomId}`}>Join</Link>
 					</Button>
@@ -73,6 +78,12 @@ export function MeetingCard({ meeting }: MeetingCardProps) {
 						End meeting
 					</Button>
 				)}
+				<DeleteEndedMeetingButton
+					meetingId={meeting.id}
+					hostId={meeting.hostId}
+					endedAt={meeting.endedAt}
+					title={meeting.title}
+				/>
 			</div>
 		</div>
 	);

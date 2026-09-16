@@ -36,6 +36,21 @@ export type AiAssistantMessage = {
 	timestamp: string;
 };
 
+export type AiToolCalledPayload = {
+	roomId: string;
+	messageId: string;
+	name: string;
+	args: Record<string, unknown>;
+	result: string;
+};
+
+export type AiTokenPayload = {
+	roomId: string;
+	messageId: string;
+	token: string;
+	done: boolean;
+};
+
 export type PresenceUser = {
 	userId: string;
 	displayName: string;
@@ -55,7 +70,10 @@ export interface ServerToClientEvents {
 	transcription_stopped: (payload: { roomId: string }) => void;
 	note_current: (payload: { note: MeetingNoteDto | null }) => void;
 	note_updated: (payload: { note: MeetingNoteDto }) => void;
+	ai_history: (payload: { messages: AiAssistantMessage[] }) => void;
 	ai_message: (payload: { message: AiAssistantMessage }) => void;
+	ai_token: (payload: AiTokenPayload) => void;
+	ai_tool_called: (payload: AiToolCalledPayload) => void;
 	ai_typing: (payload: { roomId: string; typing: boolean }) => void;
 	error: (payload: { message: string }) => void;
 }

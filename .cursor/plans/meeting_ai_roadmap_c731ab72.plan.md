@@ -19,16 +19,16 @@ todos:
     status: completed
   - id: phase-4-passive-ai
     content: "Phase 4: BullMQ workers; Gemini notes + Groq 8B routing; note_updated + NotesPanel"
-    status: pending
+    status: completed
   - id: phase-5-interactive-ai
     content: "Phase 5: @AI detection; Groq 70B streaming ai_token; AIAssistantPanel + optional ElevenLabs"
-    status: pending
+    status: completed
   - id: phase-6-tools
     content: "Phase 6: Tool registry on server; ai_tool_called; send_summary + search_web first"
-    status: pending
+    status: completed
   - id: phase-7-post-meeting
     content: "Phase 7: /notes/[meetingId], /settings, finalize-meeting jobs, analytics aggregates"
-    status: pending
+    status: completed
 isProject: false
 ---
 

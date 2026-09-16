@@ -12,6 +12,16 @@ Speaker: ${params.speaker}
 Line: ${params.text}`;
 }
 
+export function buildInteractiveIntentPrompt(text: string): string {
+	return `You classify whether a meeting chat message is directed at the in-meeting AI assistant.
+Reply with JSON only: {"addressedToAi": boolean}
+
+Mark addressedToAi=true only if the speaker is clearly asking the AI assistant to summarize, extract actions, search, or answer a question about the meeting.
+Mark addressedToAi=false for human-to-human conversation, acknowledgements, or offhand mentions of AI products.
+
+Message: ${text}`;
+}
+
 export function buildPassiveNotesPrompt(params: {
 	meetingTitle: string;
 	transcriptLines: string;

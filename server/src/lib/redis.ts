@@ -19,3 +19,15 @@ export function getRedisConnection(): IORedis {
 
 	return connection;
 }
+
+/** Connection options for BullMQ (avoids dual ioredis type mismatch). */
+export function getBullmqConnection() {
+	if (!isRedisConfigured()) {
+		throw new Error("REDIS_URL is not configured");
+	}
+
+	return {
+		url: process.env.REDIS_URL!,
+		maxRetriesPerRequest: null,
+	};
+}

@@ -9,7 +9,6 @@ import {
 	LayoutDashboard,
 	LogOut,
 	Plug,
-	Settings,
 	Sparkles,
 	Video,
 } from "lucide-react";
@@ -46,7 +45,6 @@ const navItems = [
 	{ href: "/notes", label: "Notes", icon: FileText },
 	{ href: "/action-items", label: "Action Items", icon: CheckSquare },
 	{ href: "/integrations", label: "Integrations", icon: Plug },
-	{ href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function AppSidebar() {
